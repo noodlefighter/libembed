@@ -20,10 +20,20 @@
 /**
  *
  * todo: doxygen comment format
- * @name        MSM config
+ * @name        Libembed Config
  * @{
  */
+#define LIBEMBED_CFG_INLINE_ENABLE              1
+#define LIBEMBED_CFG_LOCAL_FUNC_ENABLE          1
 
+/** @} */
+
+/**
+ *
+ * todo: doxygen comment format
+ * @name        MSM Config
+ * @{
+ */
 
 /**
  * @brief   size of msm_event_t
@@ -35,7 +45,7 @@
 #define LIBEMBED_CFG_MSM_EVT_SIZE      2
 #endif
 
-/* @} */
+/** @} */
 
 
 
