@@ -33,11 +33,11 @@ typedef msm_hdler_ret_t (*msm_handler_t)(msm_state_t *p_this);
 
 /** @brief MSM state type definition */
 typedef struct msm_state {
-    struct msm_state  *p_sup_state;  /**< @brief super state */
-    msm_handler_t      p_hdler;      /**< @brief general event handler */
-    msm_handler_t      p_init;       /**< @brief initial event handler */
-    msm_handler_t      p_entry;      /**< @brief entry   event handler */
-    msm_handler_t      p_exit;       /**< @brief exit    event handler */
+    struct msm_state        *p_sup_state;  /**< @brief super state */
+    const msm_handler_t      p_hdler;      /**< @brief general event handler */
+    const msm_handler_t      p_init;       /**< @brief initial event handler */
+    const msm_handler_t      p_entry;      /**< @brief entry   event handler */
+    const msm_handler_t      p_exit;       /**< @brief exit    event handler */
 } msm_state_t;
 
 #if   (LIBEMBED_CFG_MSM_EVT_SIZE == 2)
@@ -60,7 +60,7 @@ typedef struct {
 
 /** @brief metal  */
 typedef struct {
-    msm_state_t       *p_state;     /**< @brief current state */
+    const msm_state_t *p_state;     /**< @brief current state */
 
     /** @brief temprory variable for importing some variable */
     union {
@@ -98,7 +98,9 @@ void msm_evt_in (msm_t *p_this, msm_evt_num_t evt_num, msm_evt_arg_t arg)
 #define MSM_TRAN(p_this, p_state) \
             ((p_this)->tmp.p_state = (p_state), MSM_RET_TRAN)
 
+int msm_init (msm_t *p_this, msm_handler_t *p_action_init);
 
+int msm_start (msm_t *p_this);
 
 #ifdef __cplusplus
 }

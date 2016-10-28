@@ -42,9 +42,12 @@
  *          8: { uint32_t event_number, uint32_t arg }
  */
 #ifndef LIBEMBED_CFG_MSM_EVT_SIZE
-#define LIBEMBED_CFG_MSM_EVT_SIZE      2
+#define LIBEMBED_CFG_MSM_EVT_SIZE               2
 #endif
 
+#ifndef LIBEMBED_CFG_MSM_DEPTH
+#define LIBEMBED_CFG_MSM_DEPTH                  5
+#endif
 /** @} */
 
 
