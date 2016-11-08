@@ -46,6 +46,28 @@ int msm_start (msm_t *p_this)
 
 msm_hdler_ret_t __msm_exec_tran (msm_t *p_this, const msm_state_t *p_target)
 {
+    uint8_t i, len_s, len_t, len_min;
+
+    msm_hdler_ret_t ret = MSM_RET_HANDLED;
+    const msm_state_t *p_stmp;
+    const msm_state_t *(p_s[LIBEMBED_CFG_MSM_DEPTH]);
+    const msm_state_t *(p_t[LIBEMBED_CFG_MSM_DEPTH]);
+
+    /*
+     * Step1. calculate the number of times do exit&entry action.
+     */
+    if ((p_this->p_state != p_target) &&
+        (p_this->p_state->p_sup_state != p_target->p_sup_state))
+    {
+        /* calulate "chain to top" */
+        p_stmp = p_this->p_state;
+        for (len_s = 0; NULL != p_stmp; (len_s++, p_stmp = p_stmp->p_sup_state)) {
+            p_s[len_s] = p_stmp;
+        }
+
+    }
+
+
 
 }
 
