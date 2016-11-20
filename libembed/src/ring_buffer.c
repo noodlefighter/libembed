@@ -1,105 +1,188 @@
-/* ring_buffer.c: Simple ring buffer API */
-
-/*
- * Copyright (c) 2015 Intel Corporation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-#include <misc/ring_buffer.h>
-
 /**
- * Internal data structure for a buffer header.
+ * @file
+ * @brief
  *
- * We want all of this to fit in a single uint32_t. Every item stored in the
- * ring buffer will be one of these headers plus any extra data supplied
+ *     details...
+ *
+ * @internal
+ * @par Modification history
+ * - 1.00 2016-11-20  noodlefighter
+ * @endinternal
  */
-struct ring_element {
-	uint32_t  type   :16; /**< Application-specific */
-	uint32_t  length :8;  /**< length in 32-bit chunks */
-	uint32_t  value  :8;  /**< Room for small integral values */
-};
 
-int sys_ring_buf_put(struct ring_buf *buf, uint16_t type, uint8_t value,
-		     uint32_t *data, uint8_t size32)
+#include "ring_buffer.h"
+#include "string.h"
+
+/******************************************************************************/
+error_t ringbuf_init (ringbuf_t *p_ringbuf,
+                      uint32_t   item_size,
+                      uint32_t   buffer_size,
+                      void      *p_buffer)
 {
-	uint32_t i, space, index, rc;
+    if (buffer_size % item_size != 0) {
+        return -EINVAL;
+    }
 
-	space = sys_ring_buf_space_get(buf);
-	if (space >= (size32 + 1)) {
-		struct ring_element *header =
-				(struct ring_element *)&buf->buf[buf->tail];
-		header->type = type;
-		header->length = size32;
-		header->value = value;
+    p_ringbuf->item_size = item_size;
+    p_ringbuf->size      = buffer_size;
+    p_ringbuf->p_buf     = p_buffer;
 
-		if (likely(buf->mask)) {
-			for (i = 0; i < size32; ++i) {
-				index = (i + buf->tail + 1) & buf->mask;
-				buf->buf[index] = data[i];
-			}
-			buf->tail = (buf->tail + size32 + 1) & buf->mask;
-		} else {
-			for (i = 0; i < size32; ++i) {
-				index = (i + buf->tail + 1) % buf->size;
-				buf->buf[index] = data[i];
-			}
-			buf->tail = (buf->tail + size32 + 1) % buf->size;
-		}
-		rc = 0;
-	} else {
-		buf->dropped_put_count++;
-		rc = -EMSGSIZE;
-	}
+    p_ringbuf->head      = 0;
+    p_ringbuf->tail      = 0;
+//    p_ringbuf->count     = 0;
 
-	return rc;
+    if (IS_POW_OF_TWO(buffer_size)) {
+        p_ringbuf->mask = size - 1;
+    } else {
+        p_ringbuf->mask = 0;
+    }
+
+    return 0;
 }
 
-int sys_ring_buf_get(struct ring_buf *buf, uint16_t *type, uint8_t *value,
-		     uint32_t *data, uint8_t *size32)
+/******************************************************************************/
+error_t ringbuf_insert (ringbuf_t  *p_ringbuf,
+                        void       *p_data)
 {
-	struct ring_element *header;
-	uint32_t i, index;
+    error_t ret = 0;
 
-	if (sys_ring_buf_is_empty(buf)) {
-		return -EAGAIN;
-	}
+    if (ringbuf_space_get(buf) >= p_ringbuf->item_size) {
+        /* copy */
+        memcpy(&p_ringbuf->p_buf[p_ringbuf->tail], p_data, p_ringbuf->item_size);
 
-	header = (struct ring_element *) &buf->buf[buf->head];
+        /* modify tail */
+        if (p_ringbuf->mask) {
+            p_ringbuf->tail = p_ringbuf->mask & (p_ringbuf->tail + p_ringbuf->item_size);
+        } else {
+            p_ringbuf->tail += p_ringbuf->item_size;
+            if (p_ringbuf->tail > p_ringbuf->size) {
+                p_ringbuf->tail -= p_ringbuf->size;
+            }
+        }
+    } else {
+        ret = -EMSGSIZE;
+    }
 
-	if (header->length > *size32) {
-		*size32 = header->length;
-		return -EMSGSIZE;
-	}
-
-	*size32 = header->length;
-	*type = header->type;
-	*value = header->value;
-
-	if (likely(buf->mask)) {
-		for (i = 0; i < header->length; ++i) {
-			index = (i + buf->head + 1) & buf->mask;
-			data[i] = buf->buf[index];
-		}
-		buf->head = (buf->head + header->length + 1) & buf->mask;
-	} else {
-		for (i = 0; i < header->length; ++i) {
-			index = (i + buf->head + 1) % buf->size;
-			data[i] = buf->buf[index];
-		}
-		buf->head = (buf->head + header->length + 1) % buf->size;
-	}
-
-	return 0;
+    return ret;
 }
 
+/******************************************************************************/
+error_t ringbuf_insert_multi (ringbuf_t  *p_ringbuf,
+                              void       *p_data,
+                              uint32_t    length)
+{
+    uint32_t i, remain_space, need_space;
+    error_t  ret = 0;
+
+    need_space   = length * p_ringbuf->item_size;
+    remain_space = ringbuf_space_get(buf);
+
+    if (remain_space >= need_space) {
+        /*
+         * In this situation, if (size-tail < need_space),
+         * need to use memcpy() twice. (Unlikely)
+         *
+         * 0   head    tail    size
+         * |     ||||||||       |
+         *
+         */
+        if (!((p_ringbuf->head < p_ringbuf->tail) &&
+              (p_ringbuf->size - p_ringbuf->tail < need_space)))
+        {
+            /* copy once */
+            memcpy(&p_ringbuf->p_buf[p_ringbuf->tail], p_data, need_space);
+        } else {
+            /* copy twice */
+            uint32_t right_remain_space = p_ringbuf->size - p_ringbuf->tail;
+            memcpy(&p_ringbuf->p_buf[p_ringbuf->tail], p_data, right_remain_space);
+            memcpy(&p_ringbuf->p_buf[0], p_data, need_space - right_remain_space);
+        }
+
+        /* modify tail */
+        if (p_ringbuf->mask) {
+            p_ringbuf->tail = p_ringbuf->mask & (p_ringbuf->tail + need_space);
+        } else {
+            p_ringbuf->tail += need_space;
+            if (p_ringbuf->tail > p_ringbuf->size) {
+                p_ringbuf->tail -= p_ringbuf->size;
+            }
+        }
+    } else {
+        ret = -EMSGSIZE;
+    }
+
+    return ret;
+}
+
+/******************************************************************************/
+error_t ringbuf_pop (ringbuf_t  *p_ringbuf,
+                     void       *p_buf)
+{
+    error_t  ret = 0;
+
+    if (ringbuf_used_get(p_ringbuf) >= p_ringbuf->item_size) {
+        /* cpoy */
+        memcpy(p_buf, &p_ringbuf->p_buf[p_ringbuf->head], p_ringbuf->item_size);
+
+        /* modify head */
+        if (p_ringbuf->mask) {
+            p_ringbuf->head = p_ringbuf->mask & (p_ringbuf->head + p_ringbuf->item_size);
+        } else {
+            p_ringbuf->head += p_ringbuf->item_size;
+            if (p_ringbuf->head > p_ringbuf->size) {
+                p_ringbuf->head -= p_ringbuf->size;
+            }
+        }
+    } else {
+        ret = -EMSGSIZE;
+    }
+
+    return ret;
+
+}
+
+/******************************************************************************/
+error_t ringbuf_pop_multi (ringbuf_t  *p_ringbuf,
+                           void       *p_buf,
+                           uint32_t    length)
+{
+    uint32_t pop_space;
+    error_t  ret = 0;
+
+    pop_space = p_ringbuf->item_size * length;
+    if (ringbuf_used_get(p_ringbuf) >= pop_space) {
+        /*
+         * In this situation, if (size-head < pop_space),
+         * need to use memcpy() twice. (Unlikely)
+         *
+         * 0   tail    head    size
+         * ||||||       |||||||||
+         *
+         */
+        if (!((p_ringbuf->tail < p_ringbuf->head) &&
+              (p_ringbuf->size - p_ringbuf->head < pop_space)))
+        {
+            /* copy once */
+            memcpy(p_buf, &p_ringbuf->p_buf[p_ringbuf->head], pop_space);
+        } else {
+            /* copy twice */
+            uint32_t right_used_space = p_ringbuf->size - p_ringbuf->head;
+            memcpy(p_buf, &p_ringbuf->p_buf[p_ringbuf->head], right_used_space);
+            memcpy(p_buf, &p_ringbuf->p_buf[0], pop_space - right_used_space);
+        }
+
+        /* modify head */
+        if (p_ringbuf->mask) {
+            p_ringbuf->head = p_ringbuf->mask & (p_ringbuf->head + pop_space);
+        } else {
+            p_ringbuf->head += pop_space;
+            if (p_ringbuf->head > p_ringbuf->size) {
+                p_ringbuf->head -= p_ringbuf->size;
+            }
+        }
+    } else {
+        ret = -EMSGSIZE;
+    }
+
+    return ret;
+}

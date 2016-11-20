@@ -12,6 +12,7 @@
 
 #include <stdint.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #include "_libem_config.h"   /** from user dir */
 

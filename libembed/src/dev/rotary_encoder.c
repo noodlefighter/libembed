@@ -10,7 +10,7 @@
  * @endinternal
  */
 
-#include "rotary_encoder.h"
+#include "dev/rotary_encoder.h"
 #include "stddef.h"
 #define __BIT(n)    (1 << n)
 

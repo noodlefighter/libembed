@@ -1,190 +1,146 @@
-/* ring_buffer.h: Simple ring buffer API */
-
-/*
- * Copyright (c) 2015 Intel Corporation
+/**
+ * @file
+ * @brief
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *     details...
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @internal
+ * @par Modification history
+ * - 1.00 2016-11-20  noodlefighter
+ * @endinternal
  */
-/** @file */
 
 #ifndef __RING_BUFFER_H__
 #define __RING_BUFFER_H__
 
-#include <nanokernel.h>
-#include <misc/debug/object_tracing_common.h>
-#include <misc/util.h>
-#include <errno.h>
+#include "libem_common.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @brief Ring Buffer APIs
- * @defgroup nanokernel_ringbuffer Ring Bufer
- * @ingroup nanokernel_services
- * @{
- */
-
-#define SIZE32_OF(x) (sizeof((x))/sizeof(uint32_t))
-
-/**
  * @brief A structure to represent a ring buffer
  */
-struct ring_buf {
-	uint32_t head;	 /**< Index in buf for the head element */
-	uint32_t tail;	 /**< Index in buf for the tail element */
-	uint32_t dropped_put_count; /**< Running tally of the number of failed
-				     * put attempts
-				     */
-	uint32_t size;   /**< Size of buf in 32-bit chunks */
-	uint32_t *buf;	 /**< Memory region for stored entries */
-	uint32_t mask;   /**< Modulo mask if size is a power of 2 */
-#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
-	struct ring_buf *__next;
-#endif
-};
+typedef struct {
+    uint32_t  item_size;       /**< size of item */
+    uint32_t  size;            /**< size of buffer */
+    uint8_t  *p_buf;           /**< pointer to buffer */
+
+    uint32_t  head;            /**< index of head item in p_buf */
+    uint32_t  tail;            /**< index of tail item in p_buf */
+//    uint32_t  count;           /**< counter of item in buffer */
+    uint32_t  mask;            /**< mask modulo mask if size is a power of 2 */
+} ringbuf_t;
 
 /**
- * @brief Declare a power-of-two sized ring buffer
+ * @brief Initialize a ring buffer
  *
- * Use of this macro is preferred over SYS_RING_BUF_DECLARE_SIZE() as it
- * will not need to use expensive modulo operations.
+ * For optimal performance, use buffer size(item_size*length) that are a power
+ * of 2 as they don't require determine operations when maintaining the buffer.
  *
- * @param name File-scoped name of the ring buffer to declare
- * @param pow Create a buffer of 2^pow 32-bit elements
+ * @param[in,out] p_ringbuf     Ring buffer to initialize
+ * @param[in]     item_size     Size of item
+ * @param[in]     buffer_size   Size of buffer (byte)
+ * @param[in]     p_buffer      pointer to buffer
  */
-#define SYS_RING_BUF_DECLARE_POW2(name, pow) \
-	static uint32_t _ring_buffer_data_##name[1 << (pow)]; \
-	struct ring_buf name = { \
-		.size = (1 << (pow)), \
-		.mask = (1 << (pow)) - 1, \
-		.buf = _ring_buffer_data_##name \
-	};
-
-/**
- * @brief Declare an arbitrary sized ring buffer
- *
- * A ring buffer declared in this way has more flexibility on buffer size
- * but will use more expensive modulo operations to maintain itself.
- *
- * @param name File-scoped name of the ring buffer to declare
- * @param size32 Size of buffer in 32-bit elements
- */
-#define SYS_RING_BUF_DECLARE_SIZE(name, size32) \
-	static uint32_t _ring_buffer_data_##name[size32]; \
-	struct ring_buf name = { \
-		.size = size32, \
-		.buf = _ring_buffer_data_##name \
-	};
-
-/**
- * @brief Initialize a ring buffer, in cases where DECLARE_RING_BUF_STATIC
- * isn't used.
- *
- * For optimal performance, use size values that are a power of 2 as they
- * don't require expensive modulo operations when maintaining the buffer.
- *
- * @param buf Ring buffer to initialize
- * @param size Size of the provided buffer in 32-bit chunks
- * @param data Data area for the ring buffer, typically
- *	  uint32_t data[size]
- */
-static inline void sys_ring_buf_init(struct ring_buf *buf, uint32_t size,
-				     uint32_t *data)
-{
-	buf->head = 0;
-	buf->tail = 0;
-	buf->dropped_put_count = 0;
-	buf->size = size;
-	buf->buf = data;
-	if (is_power_of_two(size)) {
-		buf->mask = size - 1;
-	} else {
-		buf->mask = 0;
-	}
-
-	SYS_TRACING_OBJ_INIT(sys_ring_buf, buf);
-}
+error_t ringbuf_init (ringbuf_t *p_ringbuf,
+                      uint32_t   item_size,
+                      uint32_t   buffer_size,
+                      void      *p_buffer);
 
 /**
  * @brief Determine if a ring buffer is empty
- *
- * @return nonzero if the buffer is empty
  */
-static inline int sys_ring_buf_is_empty(struct ring_buf *buf)
+__STATIC_INLINE
+bool ringbuf_is_empty (ringbuf_t *p_ringbuf)
 {
-	return (buf->head == buf->tail);
+	return (p_ringbuf->head == p_ringbuf->tail);
 }
 
 /**
  * @brief Obtain available space in a ring buffer
- *
- * @param buf Ring buffer to examine
- * @return Available space in the buffer in 32-bit chunks
  */
-static inline int sys_ring_buf_space_get(struct ring_buf *buf)
+__STATIC_INLINE
+uint32_t ringbuf_space_get (ringbuf_t *p_ringbuf)
 {
-	if (sys_ring_buf_is_empty(buf)) {
-		return buf->size - 1;
+	if (ringbuf_is_empty(p_ringbuf)) {
+		return p_ringbuf->size;
 	}
 
-	if (buf->tail < buf->head) {
-		return buf->head - buf->tail - 1;
+	if (p_ringbuf->tail < p_ringbuf->head) {
+		return p_ringbuf->head - p_ringbuf->tail;
 	}
 
-	/* buf->tail > buf->head */
-	return (buf->size - buf->tail) + buf->head - 1;
+	/* p_ringbuf->tail > p_ringbuf->head */
+	return (p_ringbuf->size - p_ringbuf->tail) + p_ringbuf->head;
 }
 
 /**
- * @brief Place an entry into the ring buffer
- *
- * Concurrency control is not implemented, however no synchronization is needed
- * between put() and get() operations as they independently work on the
- * tail and head values, respectively.
- * Any use-cases involving multiple producers will need to synchronize use
- * of this function, by either disabling preemption or using a mutex.
- *
- * @param buf Ring buffer to insert data to
- * @param type Application-specific type identifier
- * @param value Integral data to include, application specific
- * @param data Pointer to a buffer containing data to enqueue
- * @param size32 Size of data buffer, in 32-bit chunks (not bytes)
- * @return 0 on success, -ENOSPC if there isn't sufficient space
+ * @brief Obtain used space in a ring buffer
  */
-int sys_ring_buf_put(struct ring_buf *buf, uint16_t type, uint8_t value,
-		     uint32_t *data, uint8_t size32);
+__STATIC_INLINE
+uint32_t ringbuf_used_get (ringbuf_t *p_ringbuf)
+{
+    if (ringbuf_is_empty(p_ringbuf)) {
+        return 0;
+    }
+
+    if (p_ringbuf->tail < p_ringbuf->head) {
+        return (p_ringbuf->size - p_ringbuf->head) + p_ringbuf->tail;
+    }
+
+    /* p_ringbuf->tail > p_ringbuf->head */
+    return p_ringbuf->tail - p_ringbuf->head;
+}
 
 /**
- * @brief Fetch data from the ring buffer
+ * @brief Insert a item into ring buffer.
  *
- * @param buf Ring buffer to extract data from
- * @param type Return storage of the retrieved event type
- * @param value Return storage of the data value
- * @param data Buffer to copy data into
- * @param size32 Indicates the size of the data buffer. On return,
- *	updated with the actual amount of 32-bit chunks written to the buffer
- * @return 0 on success, -EAGAIN if the ring buffer is empty, -EMSGSIZE
- *	if the supplied buffer is too small (size32 will be updated with
- *	the actual size needed)
+ * @param[in,out] p_ringbuf     Ring buffer to insert data to
+ * @param[in]     p_data        pointer to item
+ *
+ * @return 0 on success, -EMSGSIZE if there isn't sufficient space
  */
-int sys_ring_buf_get(struct ring_buf *buf, uint16_t *type, uint8_t *value,
-		     uint32_t *data, uint8_t *size32);
+error_t ringbuf_insert (ringbuf_t  *p_ringbuf,
+                        void       *p_data);
 
 /**
- * @}
+ * @brief Insert mulit items into ring buffer.
+ *
+ * @param[in,out] p_ringbuf     Ring buffer to insert data to
+ * @param[in]     p_data        pointer to items
+ * @param[in]     length        number of items
+ *
+ * @return 0 on success, -EMSGSIZE if there isn't sufficient space
  */
+error_t ringbuf_insert_multi (ringbuf_t  *p_ringbuf,
+                              void       *p_data,
+                              uint32_t    length);
+
+/**
+ * @brief Pop a item into ring buffer.
+ *
+ * @param[in,out] p_ringbuf     Ring buffer to insert data to
+ * @param[in]     p_buf         pointer to pop buffer
+ *
+ * @return 0 on success, -EMSGSIZE if ring buffer is empty
+ */
+error_t ringbuf_pop (ringbuf_t  *p_ringbuf,
+                     void       *p_buf);
+
+/**
+ * @brief Pop mulit items into ring buffer.
+ *
+ * @param[in,out] p_ringbuf     Ring buffer to insert data to
+ * @param[in]     p_buf         pointer to pop buffer
+ * @param[in]     length        number of items
+ *
+ * @return 0 on success, -EMSGSIZE if there have no enough items to pop
+ */
+error_t ringbuf_pop_multi (ringbuf_t  *p_ringbuf,
+                           void       *p_buf,
+                           uint32_t    length);
 
 #ifdef __cplusplus
 }
