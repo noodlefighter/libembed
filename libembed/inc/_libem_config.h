@@ -23,8 +23,10 @@
  * @name        Libembed Config
  * @{
  */
-#define LIBEMBED_CFG_INLINE_ENABLE              1
-#define LIBEMBED_CFG_LOCAL_FUNC_ENABLE          1
+#define LIBEMBED_SRCCFG_INLINE_ENABLE              1
+#define LIBEMBED_SRCCFG_LOCAL_FUNC_ENABLE          1
+
+#define LIBEMBED_SRCCFG_WORD_LENGTH                32
 
 /** @} */
 
@@ -41,12 +43,12 @@
  *          4: { uint16_t event_number, uint16_t arg }
  *          8: { uint32_t event_number, uint32_t arg }
  */
-#ifndef LIBEMBED_CFG_MSM_EVT_SIZE
-#define LIBEMBED_CFG_MSM_EVT_SIZE               2
+#ifndef LIBEMBED_SRCCFG_MSM_EVT_SIZE
+#define LIBEMBED_SRCCFG_MSM_EVT_SIZE               2
 #endif
 
-#ifndef LIBEMBED_CFG_MSM_DEPTH
-#define LIBEMBED_CFG_MSM_DEPTH                  5
+#ifndef LIBEMBED_SRCCFG_MSM_DEPTH
+#define LIBEMBED_SRCCFG_MSM_DEPTH                  5
 #endif
 /** @} */
 
