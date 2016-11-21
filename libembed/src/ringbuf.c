@@ -10,7 +10,7 @@
  * @endinternal
  */
 
-#include "ring_buffer.h"
+#include "ringbuf.h"
 #include "string.h"
 
 /******************************************************************************/
