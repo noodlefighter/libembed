@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <stdbool.h>
-
+#include <math.h>
 #include "_libem_config.h"   /** from user dir */
 
 /**
@@ -214,5 +214,24 @@
 #ifndef MHZ
 #define MHZ(x) (KHZ(x) * 1000)
 #endif
+
+#ifndef INTEGER_LOG2
+#ifdef __GNUC__
+#define INTEGER_LOG2(x) ((uint32_t) (31u - __builtin_clz((uint32_t)(x))))
+#else
+#define INTEGER_LOG2(x) (__libem_integer_log2(x))
+__STATIC_INLINE
+uint32_t __libem_integer_log2 (uint32_t x)
+{
+    uint32_t p = 0;
+    if (x & 0xFFFF0000) { p += 16;  n >>= 16;   }
+    if (x & 0xFF00)     { p += 8;   n >>= 8;    }
+    if (x & 0xF0)       { p += 4;   n >>= 4;    }
+    if (x & 0xC)        { p += 2;   n >>= 2;    }
+    if (x & 0x2)        { p++;                  }
+    return p;
+}
+#endif  /* __GNUC__ */
+#endif  /* INTEGER_LOG2 */
 
 #endif /* __LIBEM_COMMON_H__ */
