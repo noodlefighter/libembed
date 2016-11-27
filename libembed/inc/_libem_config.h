@@ -8,6 +8,9 @@
  *     and include this file, just like it:
  *          #include "_libem_config.h"
  *
+ *
+ *     LIBEMBED_SRCCFG_*
+ *
  * @internal
  * @par Modification history
  * - 1.00 2016-10-17  noodlefighter, first implementation
@@ -17,6 +20,13 @@
 #ifndef __LIBEMBED_CONFIG_H
 #define __LIBEMBED_CONFIG_H
 
+
+#define LIBEMBED_CFG_USE_TINY_PRINTF               1
+
+#define LIBEMBED_CFG_DEBUG_INFO_ENABLE             1
+
+
+/******************************************************************************/
 /**
  *
  * todo: doxygen comment format

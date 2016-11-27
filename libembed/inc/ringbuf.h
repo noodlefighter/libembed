@@ -53,7 +53,7 @@ error_t ringbuf_init (ringbuf_t *p_ringbuf,
  * @brief Determine if a ring buffer is empty
  */
 __STATIC_INLINE
-bool ringbuf_is_empty (ringbuf_t *p_ringbuf)
+int ringbuf_is_empty (ringbuf_t *p_ringbuf)
 {
 	return (p_ringbuf->head == p_ringbuf->tail);
 }
@@ -124,7 +124,7 @@ error_t ringbuf_insert_multi (ringbuf_t  *p_ringbuf,
  * @param[in,out] p_ringbuf     Ring buffer to insert data to
  * @param[in]     p_buf         pointer to pop buffer
  *
- * @return 0 on success, -EMSGSIZE if ring buffer is empty
+ * @return 0 on success, -EAGAIN if ring buffer is empty
  */
 error_t ringbuf_pop (ringbuf_t  *p_ringbuf,
                      void       *p_buf);

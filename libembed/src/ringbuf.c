@@ -32,7 +32,7 @@ error_t ringbuf_init (ringbuf_t *p_ringbuf,
 //    p_ringbuf->count     = 0;
 
     if (IS_POW_OF_TWO(buffer_size)) {
-        p_ringbuf->mask = size - 1;
+        p_ringbuf->mask = buffer_size - 1;
     } else {
         p_ringbuf->mask = 0;
     }
@@ -46,7 +46,7 @@ error_t ringbuf_insert (ringbuf_t  *p_ringbuf,
 {
     error_t ret = 0;
 
-    if (ringbuf_space_get(buf) >= p_ringbuf->item_size) {
+    if (ringbuf_space_get(p_ringbuf) >= p_ringbuf->item_size) {
         /* copy */
         memcpy(&p_ringbuf->p_buf[p_ringbuf->tail], p_data, p_ringbuf->item_size);
 
@@ -71,11 +71,11 @@ error_t ringbuf_insert_multi (ringbuf_t  *p_ringbuf,
                               void       *p_data,
                               uint32_t    length)
 {
-    uint32_t i, remain_space, need_space;
+    uint32_t remain_space, need_space;
     error_t  ret = 0;
 
     need_space   = length * p_ringbuf->item_size;
-    remain_space = ringbuf_space_get(buf);
+    remain_space = ringbuf_space_get(p_ringbuf);
 
     if (remain_space >= need_space) {
         /*
@@ -134,7 +134,7 @@ error_t ringbuf_pop (ringbuf_t  *p_ringbuf,
             }
         }
     } else {
-        ret = -EMSGSIZE;
+        ret = -EAGAIN;
     }
 
     return ret;

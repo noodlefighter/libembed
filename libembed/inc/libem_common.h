@@ -12,7 +12,6 @@
 
 #include <stdint.h>
 #include <errno.h>
-#include <stdbool.h>
 #include <math.h>
 #include "_libem_config.h"   /** from user dir */
 

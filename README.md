@@ -11,6 +11,7 @@ toolkit for embeded develop
 --------
 __工具宏集__ 常用宏/位操作/大小端字节操作
 
+__tinyprintf__ 一个轻量的格式化输出函数库 不支持浮点数(考虑以后添加) fork from [tinyprintf](https://github.com/cjlano/tinyprintf)
 
 进行中
 ------
