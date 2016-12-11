@@ -14,21 +14,6 @@
  * @endinternal
  */
 
-/* libembed adapter */
-#include <stdio.h>
-
-/* link to stdout */
-static
-void stdout_putf (void *unused, char c)
-{
-    (void) unused;
-    (void) c;
-
-    putchar(c);
-}
-
-/* libembed adapter end */
-
 /*
 Copyright (c) 2004,2012 Kustaa Nyholm / SpareTimeLabs
 All rights reserved.
@@ -459,21 +444,20 @@ void tfp_format(void *putp, putcf putf, const char *fmt, va_list va)
 }
 
 #if TINYPRINTF_DEFINE_TFP_PRINTF
-//static putcf stdout_putf;
-//static void *stdout_putp;
-//
-//void init_printf(void *putp, putcf putf)
-//{
-//    stdout_putf = putf;
-//    stdout_putp = putp;
-//}
+static putcf stdout_putf;
+static void *stdout_putp;
+
+void tfp_init(void *putp, putcf putf)
+{
+    stdout_putf = putf;
+    stdout_putp = putp;
+}
 
 void tfp_printf(char *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-//    tfp_format(stdout_putp, stdout_putf, fmt, va);
-    tfp_format(NULL, stdout_putf, fmt, va);
+    tfp_format(stdout_putp, stdout_putf, fmt, va);
     va_end(va);
 }
 #endif

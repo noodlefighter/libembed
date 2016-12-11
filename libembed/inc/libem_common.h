@@ -15,6 +15,16 @@
 #include <math.h>
 #include "_libem_config.h"   /** from user dir */
 
+/* interval debug */
+#if (LIBEMBED_SRCCFG_DEBUG)
+#include "tinyprintf.h"
+#include "dbginfo.h"
+#define __LIBEM_DBG     dbginfo
+#else
+#define __LIBEM_DBG     (void)
+#endif
+
+
 /**
  * @name keyword redefine for unity test and widely compiler support
  * @{

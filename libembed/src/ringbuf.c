@@ -16,8 +16,8 @@
 /******************************************************************************/
 error_t ringbuf_init (ringbuf_t *p_ringbuf,
                       uint32_t   item_size,
-                      uint32_t   buffer_size,
-                      void      *p_buffer)
+                      void      *p_buffer,
+                      uint32_t   buffer_size)
 {
     if (buffer_size % item_size != 0) {
         return -EINVAL;

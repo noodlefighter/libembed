@@ -46,8 +46,8 @@ typedef struct {
  */
 error_t ringbuf_init (ringbuf_t *p_ringbuf,
                       uint32_t   item_size,
-                      uint32_t   buffer_size,
-                      void      *p_buffer);
+                      void      *p_buffer,
+                      uint32_t   buffer_size);
 
 /**
  * @brief Determine if a ring buffer is empty

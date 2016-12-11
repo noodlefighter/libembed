@@ -15,6 +15,8 @@
 
 #include <stdint.h>     /* C99 integer typedef */
 
+#include "libem_common.h"
+
 #ifdef __cplusplus
 extern "C"
 {
