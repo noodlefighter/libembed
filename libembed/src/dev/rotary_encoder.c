@@ -13,73 +13,208 @@
 #include "dev/rotary_encoder.h"
 #include <stddef.h>
 
-/******************************************************************************/
-uint8_t rotary_encoder_init (rotary_encoder_t *p_this, uint8_t signal_number)
-{
-    /* check parameters */
-    if ((NULL == p_this) || (signal_number < 2) || (signal_number > 8))
-    {
-        return !0;
-    }
+#define __TRIG_CONFIRM_COUNT_MAX   (5u)
+#define __FREE_CONFIRM_COUNT_MAX   (5u)
 
-    /* initialize structure members */
-    p_this->sig_msb = (uint8_t) (signal_number - 1);
-    p_this->sig_prior = 0xff;
+
+#define __EVT_A_FALLING        (0u)
+#define __EVT_A_RASING         (1u)
+#define __EVT_B_FALLING        (2u)
+#define __EVT_B_RASING         (3u)
+#define __EVT_TIMER_OVERFLOW   (4u)
+
+enum {
+    __SIG_STATE_ENTRY = 200,
+    __SIG_STATE_EXIT,
+};
+
+/* state machine definition macros */
+#define __STATE(name)  __LOCAL void __STATE_##name (rotary_encoder_t *p_this, \
+                                                    uint8_t           event)
+
+/* state machine transit macros, execute exit&entry action */
+#define __TRAN(p_this, next_state)                                  do      \
+        {                                                                   \
+            p_this->pfn_state(p_this, __SIG_STATE_EXIT);                    \
+            p_this->pfn_state = __STATE_##next_state;                       \
+            p_this->pfn_state(p_this, __SIG_STATE_ENTRY);                   \
+        }                                                           while(0)
+
+
+__STATE (FREE)
+{
+    switch (event) {
+    case ROTARY_ENCODER_a_level_FALLING:
+        if (p_this->b_level) {
+            __TRAN(p_this, A_PRE_TRIGGER);
+        }
+        break;
+
+    case ROTARY_ENCODER_b_level_FALLING:
+        if (p_this->a_level) {
+            __TRAN(p_this, B_PRE_TRIGGER);
+        }
+        break;
+
+    default:
+        break;
+    }
+}
+
+__STATE (A_PRE_TRIGGER)
+{
+    switch (event) {
+    case __EVT_TIMER_OVERFLOW:
+        if (p_this->a_level) {
+            p_this->count++;
+            if (p_this->count >= __TRIG_CONFIRM_COUNT_MAX) {
+                __TRAN(p_this, A_TRIGGERED);
+            }
+        } else {
+            __TRAN(p_this, FREE);
+        }
+        break;
+
+    case __SIG_STATE_ENTRY:
+        p_this->count = 0;
+        p_this->pfn_timer_start();
+        break;
+
+    case __SIG_STATE_EXIT:
+        p_this->pfn_timer_stop();
+        break;
+
+    default:
+        break;
+    }
+}
+__STATE (A_TRIGGERED)
+{
+    switch (event) {
+    case __SIG_STATE_ENTRY:
+        p_this->pfn_cb_a_trigger();
+        break;
+
+    case ROTARY_ENCODER_a_level_RASING:
+        __TRAN(p_this, A_PRE_FREE);
+        break;
+
+    default:
+        break;
+    }
+}
+
+__STATE (A_PRE_FREE)
+{
+    switch (event) {
+    case __EVT_TIMER_OVERFLOW:
+        if (p_this->b_level) {
+            p_this->count++;
+            if (p_this->count >= __FREE_CONFIRM_COUNT_MAX) {
+                __TRAN(p_this, FREE);
+            }
+        } else {
+            p_this->count = 0;
+        }
+        break;
+
+    case __SIG_STATE_ENTRY:
+        p_this->count = 0;
+        p_this->pfn_timer_start();
+        break;
+
+    case __SIG_STATE_EXIT:
+        p_this->pfn_timer_stop();
+        break;
+
+    default:
+        break;
+    }
+}
+
+__STATE (B_PRE_TRIGGER)
+{
+    switch (event) {
+    case __EVT_TIMER_OVERFLOW:
+        if (p_this->b_level) {
+            p_this->count++;
+            if (p_this->count >= __TRIG_CONFIRM_COUNT_MAX) {
+                __TRAN(p_this, B_TRIGGERED);
+            }
+        } else {
+            __TRAN(p_this, FREE);
+        }
+        break;
+
+    case __SIG_STATE_ENTRY:
+        p_this->count = 0;
+        p_this->pfn_timer_start();
+        break;
+
+    case __SIG_STATE_EXIT:
+        p_this->pfn_timer_stop();
+        break;
+
+    default:
+        break;
+    }
+}
+__STATE (B_TRIGGERED)
+{
+    switch (event) {
+    case __SIG_STATE_ENTRY:
+        p_this->pfn_cb_b_trigger();
+        break;
+
+    case ROTARY_ENCODER_a_level_RASING:
+        __TRAN(p_this, B_PRE_FREE);
+        break;
+
+    default:
+        break;
+    }
+}
+
+__STATE (B_PRE_FREE)
+{
+    switch (event) {
+    case __EVT_TIMER_OVERFLOW:
+        if (p_this->a_level) {
+            p_this->count++;
+            if (p_this->count >= __FREE_CONFIRM_COUNT_MAX) {
+                __TRAN(p_this, FREE);
+            }
+        } else {
+            p_this->count = 0;
+        }
+        break;
+
+    case __SIG_STATE_ENTRY:
+        p_this->count = 0;
+        p_this->pfn_timer_start();
+        break;
+
+    case __SIG_STATE_EXIT:
+        p_this->pfn_timer_stop();
+        break;
+
+    default:
+        break;
+    }
+}
+
+/******************************************************************************/
+uint8_t rotary_encoder_init (rotary_encoder_t *p_this,
+                             void             (*pfn_timer_start) (void),
+                             void             (*pfn_timer_stop)  (void),
+                             void             (*pfn_cb_trigger)  (int8_t))
+{
+
+    p_this->pfn_state = __STATE_FREE;
 
     return 0;
 }
 
-/******************************************************************************/
-/**
- * @brief       decoder state machine
- * @details
- * @return      ROTARY_ENCODER_*
- */
-__LOCAL
-uint8_t __decoder (rotary_encoder_t *p_this, uint8_t falling_bits)
-{
-    int8_t  state   = p_this->state;
-    uint8_t sig_msb = p_this->sig_msb;
-    uint8_t ret     = ROTARY_ENCODER_NONE;
-
-    if (0 == state) {                             /* STATE: NONE */
-        if (falling_bits & BIT(0)) {              /* if signal_0 on falling edge */
-            p_this->state = 1;                    /* entry POSITIVE_1 */
-        } else if (falling_bits & BIT(sig_msb)) { /* if signal_n on falling edge */
-            p_this->state = -1;                   /* entry INVERSION_1 */
-        }
-
-    } else if (state > 0) {                       /* STATE: POSITIVE_* */
-        if (falling_bits & BIT(state)) {          /* the last signal */
-            if (state == sig_msb) {               /* now, the last state */
-                ret = ROTARY_ENCODER_POSITIVE;    /* confirm!! */
-                p_this->state = 0;                /* entry NONE */
-            } else {
-                p_this->state++;                  /* entry (POSITIVE_*+1) */
-            }
-        } else if (falling_bits & BIT(0)) {       /* error */
-            p_this->state = 0;                    /* entry NONE */
-        }
-
-    } else { /* if (p_state < 0) */               /* STATE: INVERSION_* */
-        if (falling_bits &                        /* the last signal */
-            BIT((uint8_t)((int8_t)sig_msb + state)))
-        {
-            if (state == -sig_msb) {              /* now, the last state */
-                ret = ROTARY_ENCODER_INVERSION;   /* confirm!! */
-                p_this->state = 0;                /* entry NONE */
-            } else {
-                p_this->state--;                  /* entry (INVERSION_*+1) */
-            }
-        } else if (falling_bits & BIT(sig_msb)) { /* error */
-            p_this->state = 0;                    /* entry NONE */
-        }
-    }
-
-    return ret;
-}
-
-/******************************************************************************/
 uint8_t rotary_encoder_signals_import (rotary_encoder_t  *p_this,
                                        uint8_t            signals)
 {
@@ -102,9 +237,40 @@ uint8_t rotary_encoder_signals_import (rotary_encoder_t  *p_this,
      *       ~signals & sig_differ 0001
      */
     sig_trig = (uint8_t) ((~signals) & sig_differ);
+
+    p_this->sig_prior = signals;
+
+    //todo: 500us一个采样 可以利用这个时间做软件定时器
+
     if (0x00 == sig_trig) {
         return ROTARY_ENCODER_NONE;
     } else {
+
+        uint8_t event;
+        uint8_t rc = ROTARY_ENCODER_NONE;
+
+        p_this->a_level = signals & BIT(0);
+        p_this->b_level = signals & BIT(1);
+
+        if (sig_trig & BIT(0)) {
+            if (p_this->a_level) {
+                event = __EVT_A_RASING;
+            } else {
+                event = __EVT_A_FALLING;
+            }
+            rc |= p_this->pfn_state(p_this, event);
+        }
+
+        if (sig_trig & BIT(1)) {
+            if (p_this->b_level) {
+                event = __EVT_B_RASING;
+            } else {
+                event = __EVT_B_FALLING;
+            }
+            rc |= p_this->pfn_state(p_this, event);
+        }
         return __decoder(p_this, sig_trig);
     }
 }
+
+

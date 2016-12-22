@@ -14,7 +14,6 @@
 #define ROTARY_ENCODER_H_
 
 #include <stdint.h>     /* C99 integer typedef */
-
 #include "libem_common.h"
 
 #ifdef __cplusplus
@@ -24,14 +23,19 @@ extern "C"
 
 /** @brief rotary encoder structure, initialze it before using */
 typedef struct {
-    uint8_t sig_msb;    /**< @brief Most Significant Bit of signal input */
-    uint8_t sig_prior;  /**< @brief prior signals */
-    int8_t  state;
+    uint8_t  sig_prior;
+
+    uint8_t  a_level;
+    uint8_t  b_level;
+
+    uint8_t  count;
+    void   (*pfn_state) (rotary_encoder_t *p_this, uint8_t sig);
+
 } rotary_encoder_t;
 
-#define ROTARY_ENCODER_NONE         (0)
-#define ROTARY_ENCODER_POSITIVE     (1)
-#define ROTARY_ENCODER_INVERSION    (2)
+#define ROTARY_ENCODER_NONE         (0u)
+#define ROTARY_ENCODER_POSITIVE     (1u)
+#define ROTARY_ENCODER_INVERSION    (2u)
 
 /**
  * @brief       initialize the rotary encoder structure
@@ -44,7 +48,10 @@ typedef struct {
  * @return      0           succeed
  * @return      !0          fail
  */
-uint8_t rotary_encoder_init (rotary_encoder_t *p_this, uint8_t signal_number);
+uint8_t rotary_encoder_init (rotary_encoder_t *p_this,
+                             void             (*pfn_timer_start) (void),
+                             void             (*pfn_timer_stop)  (void),
+                             void             (*pfn_cb_trigger)  (int8_t));
 
 /**
  * @brief       signals import
