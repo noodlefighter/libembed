@@ -21,21 +21,26 @@ extern "C"
 {
 #endif
 
+typedef struct rotary_encoder rotary_encoder_t;
+
+typedef void (*rotary_encoder_trigger_cb_t) (rotary_encoder_t *p_this, int8_t dir);
+
 /** @brief rotary encoder structure, initialze it before using */
-typedef struct {
-    uint8_t  sig_prior;
+struct rotary_encoder {
+    uint8_t   sig_prior;
+    uint8_t   a_level;
+    uint8_t   b_level;
+    uint8_t   count;
 
-    uint8_t  a_level;
-    uint8_t  b_level;
+    rotary_encoder_trigger_cb_t   pfn_trigger_cb;
 
-    uint8_t  count;
-    void   (*pfn_state) (rotary_encoder_t *p_this, uint8_t sig);
+    void    (*pfn_state) (rotary_encoder_t *p_this, uint8_t sig);
 
-} rotary_encoder_t;
+    uint8_t   is_softimer_on;
+};
 
-#define ROTARY_ENCODER_NONE         (0u)
-#define ROTARY_ENCODER_POSITIVE     (1u)
-#define ROTARY_ENCODER_INVERSION    (2u)
+#define ROTARY_ENCODER_TRIGGER_POSITIVE     (0u)
+#define ROTARY_ENCODER_TRIGGER_INVERSION    (1u)
 
 /**
  * @brief       initialize the rotary encoder structure
@@ -48,10 +53,8 @@ typedef struct {
  * @return      0           succeed
  * @return      !0          fail
  */
-uint8_t rotary_encoder_init (rotary_encoder_t *p_this,
-                             void             (*pfn_timer_start) (void),
-                             void             (*pfn_timer_stop)  (void),
-                             void             (*pfn_cb_trigger)  (int8_t));
+uint8_t rotary_encoder_init (rotary_encoder_t            *p_this,
+                             rotary_encoder_trigger_cb_t  pfn_trigger_cb);
 
 /**
  * @brief       signals import
@@ -68,8 +71,8 @@ uint8_t rotary_encoder_init (rotary_encoder_t *p_this,
  * @retval      ROTARY_ENCODER_POSITIVE     positive
  * @retval      ROTARY_ENCODER_INVERSION    inversion
  */
-uint8_t rotary_encoder_signals_import (rotary_encoder_t  *p_this,
-                                       uint8_t            signals);
+void rotary_encoder_signals_import (rotary_encoder_t  *p_this,
+                                    uint8_t            signals);
 
 #ifdef __cplusplus
 }

@@ -33,7 +33,7 @@
  * @name        Libembed Source Config
  * @{
  */
-#define LIBEMBED_SRCCFG_DEBUG                      1
+#define LIBEMBED_SRCCFG_DEBUG                      0
 #define LIBEMBED_SRCCFG_CHKPARAM                   1
 
 #define LIBEMBED_SRCCFG_INLINE_ENABLE              1
