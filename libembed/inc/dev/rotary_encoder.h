@@ -24,6 +24,15 @@ extern "C"
 typedef struct rotary_encoder rotary_encoder_t;
 
 typedef void (*rotary_encoder_trigger_cb_t) (rotary_encoder_t *p_this, int8_t dir);
+typedef void (*rotary_encoder_timer_set_cb_t) (rotary_encoder_t *p_this, uint8_t enable);
+
+typedef enum {
+    ROTARY_ENCODER_EVT_A_FALLING,
+    ROTARY_ENCODER_EVT_A_RASING,
+    ROTARY_ENCODER_EVT_B_FALLING,
+    ROTARY_ENCODER_EVT_B_RASING,
+    ROTARY_ENCODER_EVT_TIMER_OVERFLOW,
+} rotary_encoder_event_t;
 
 /** @brief rotary encoder structure, initialze it before using */
 struct rotary_encoder {
@@ -32,7 +41,9 @@ struct rotary_encoder {
     uint8_t   b_level;
     uint8_t   count;
 
-    rotary_encoder_trigger_cb_t   pfn_trigger_cb;
+    rotary_encoder_timer_set_cb_t pfn_timer_set;
+
+    rotary_encoder_trigger_cb_t   pfn_trigger;
 
     void    (*pfn_state) (rotary_encoder_t *p_this, uint8_t sig);
 
@@ -53,9 +64,14 @@ struct rotary_encoder {
  * @return      0           succeed
  * @return      !0          fail
  */
-uint8_t rotary_encoder_init (rotary_encoder_t            *p_this,
-                             rotary_encoder_trigger_cb_t  pfn_trigger_cb);
+int rotary_encoder_init (rotary_encoder_t             *p_this,
+                         rotary_encoder_trigger_cb_t   pfn_trigger,
+                         rotary_encoder_timer_set_cb_t pfn_timer_set);
 
+/* 事件方式 */
+void rotary_encoder_event_import (rotary_encoder_t       *p_this,
+                                  rotary_encoder_event_t  event,
+                                  uint8_t                 signals);
 /**
  * @brief       signals import
  *

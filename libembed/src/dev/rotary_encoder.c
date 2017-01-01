@@ -17,21 +17,20 @@
 #define __FREE_CONFIRM_COUNT_MAX   (1u)
 
 /* software timer */
-__STATIC_INLINE
-void __softimer_start (rotary_encoder_t *p_this) { p_this->is_softimer_on = 1; }
-
-__STATIC_INLINE
-void __softimer_stop (rotary_encoder_t *p_this) { p_this->is_softimer_on = 0; }
+__LOCAL
+void __softimer_set (rotary_encoder_t *p_this, uint8_t enable) {
+    if (enable) {
+        p_this->is_softimer_on = 1;
+    } else {
+        p_this->is_softimer_on = 0;
+    }
+}
 
 enum {
-    __EVT_STATE_ENTRY,
+    __EVT_STATE_ENTRY = 200,
     __EVT_STATE_EXIT,
-    __EVT_A_FALLING,
-    __EVT_A_RASING,
-    __EVT_B_FALLING,
-    __EVT_B_RASING,
-    __EVT_TIMER_OVERFLOW,
 };
+
 
 /* state machine definition macros */
 #define __STATE(name)                                               \
@@ -54,7 +53,13 @@ enum {
         }                                                           while(0)
 
 #else
-#define __EVT_IN(p_this, event)     (p_this->pfn_state(p_this, event))
+#define __EVT_IN(p_this, event)                                     do      \
+        {                                                                   \
+            if (NULL != p_this->pfn_state) {                                \
+                (p_this->pfn_state(p_this, event));                         \
+            }                                                               \
+        }                                                           while(0)
+
 #endif
 
 __STATE (FREE);
@@ -68,13 +73,13 @@ __STATE (B_PRE_FREE);
 __STATE (FREE)
 {
     switch (event) {
-    case __EVT_A_FALLING:
+    case ROTARY_ENCODER_EVT_A_FALLING:
         if (p_this->b_level) {
             __TRAN(p_this, A_PRE_TRIGGER);
         }
         break;
 
-    case __EVT_B_FALLING:
+    case ROTARY_ENCODER_EVT_B_FALLING:
         if (p_this->a_level) {
             __TRAN(p_this, B_PRE_TRIGGER);
         }
@@ -88,7 +93,7 @@ __STATE (FREE)
 __STATE (A_PRE_TRIGGER)
 {
     switch (event) {
-    case __EVT_TIMER_OVERFLOW:
+    case ROTARY_ENCODER_EVT_TIMER_OVERFLOW:
         if (!p_this->a_level) {
             p_this->count++;
             if (p_this->count >= __TRIG_CONFIRM_COUNT_MAX) {
@@ -101,11 +106,11 @@ __STATE (A_PRE_TRIGGER)
 
     case __EVT_STATE_ENTRY:
         p_this->count = 0;
-        __softimer_start(p_this);
+        p_this->pfn_timer_set(p_this, 1);
         break;
 
     case __EVT_STATE_EXIT:
-        __softimer_stop(p_this);
+        p_this->pfn_timer_set(p_this, 0);
         break;
 
     default:
@@ -117,10 +122,10 @@ __STATE (A_TRIGGERED)
 {
     switch (event) {
     case __EVT_STATE_ENTRY:
-        p_this->pfn_trigger_cb(p_this, ROTARY_ENCODER_TRIGGER_INVERSION);
+        p_this->pfn_trigger(p_this, ROTARY_ENCODER_TRIGGER_INVERSION);
         break;
 
-    case __EVT_A_RASING:
+    case ROTARY_ENCODER_EVT_A_RASING:
         __TRAN(p_this, A_PRE_FREE);
         break;
 
@@ -132,7 +137,7 @@ __STATE (A_TRIGGERED)
 __STATE (A_PRE_FREE)
 {
     switch (event) {
-    case __EVT_TIMER_OVERFLOW:
+    case ROTARY_ENCODER_EVT_TIMER_OVERFLOW:
         if (p_this->b_level) {
             p_this->count++;
             if (p_this->count >= __FREE_CONFIRM_COUNT_MAX) {
@@ -145,11 +150,11 @@ __STATE (A_PRE_FREE)
 
     case __EVT_STATE_ENTRY:
         p_this->count = 0;
-        __softimer_start(p_this);
+        p_this->pfn_timer_set(p_this, 1);
         break;
 
     case __EVT_STATE_EXIT:
-        __softimer_stop(p_this);
+        p_this->pfn_timer_set(p_this, 0);
         break;
 
     default:
@@ -160,7 +165,7 @@ __STATE (A_PRE_FREE)
 __STATE (B_PRE_TRIGGER)
 {
     switch (event) {
-    case __EVT_TIMER_OVERFLOW:
+    case ROTARY_ENCODER_EVT_TIMER_OVERFLOW:
         if (!p_this->b_level) {
             p_this->count++;
             if (p_this->count >= __TRIG_CONFIRM_COUNT_MAX) {
@@ -173,11 +178,11 @@ __STATE (B_PRE_TRIGGER)
 
     case __EVT_STATE_ENTRY:
         p_this->count = 0;
-        __softimer_start(p_this);
+        p_this->pfn_timer_set(p_this, 1);
         break;
 
     case __EVT_STATE_EXIT:
-        __softimer_stop(p_this);
+        p_this->pfn_timer_set(p_this, 0);
         break;
 
     default:
@@ -189,10 +194,10 @@ __STATE (B_TRIGGERED)
 {
     switch (event) {
     case __EVT_STATE_ENTRY:
-        p_this->pfn_trigger_cb(p_this, ROTARY_ENCODER_TRIGGER_POSITIVE);
+        p_this->pfn_trigger(p_this, ROTARY_ENCODER_TRIGGER_POSITIVE);
         break;
 
-    case __EVT_A_RASING:
+    case ROTARY_ENCODER_EVT_A_RASING:
         __TRAN(p_this, B_PRE_FREE);
         break;
 
@@ -204,7 +209,7 @@ __STATE (B_TRIGGERED)
 __STATE (B_PRE_FREE)
 {
     switch (event) {
-    case __EVT_TIMER_OVERFLOW:
+    case ROTARY_ENCODER_EVT_TIMER_OVERFLOW:
         if (p_this->a_level) {
             p_this->count++;
             if (p_this->count >= __FREE_CONFIRM_COUNT_MAX) {
@@ -217,11 +222,11 @@ __STATE (B_PRE_FREE)
 
     case __EVT_STATE_ENTRY:
         p_this->count = 0;
-        __softimer_start(p_this);
+        p_this->pfn_timer_set(p_this, 1);
         break;
 
     case __EVT_STATE_EXIT:
-        __softimer_stop(p_this);
+        p_this->pfn_timer_set(p_this, 0);
         break;
 
     default:
@@ -230,16 +235,35 @@ __STATE (B_PRE_FREE)
 }
 
 /******************************************************************************/
-uint8_t rotary_encoder_init (rotary_encoder_t            *p_this,
-                             rotary_encoder_trigger_cb_t  pfn_trigger_cb)
+int  rotary_encoder_init (rotary_encoder_t             *p_this,
+                          rotary_encoder_trigger_cb_t   pfn_trigger,
+                          rotary_encoder_timer_set_cb_t pfn_timer_set)
 {
 
+    if (NULL == pfn_trigger) {
+        return -1;
+    }
+
     p_this->pfn_state       = __STATE_FREE;
-    p_this->pfn_trigger_cb  = pfn_trigger_cb;
+    p_this->pfn_trigger     = pfn_trigger;
+    p_this->pfn_timer_set   = pfn_timer_set;
     p_this->sig_prior       = 0xff;
     p_this->is_softimer_on  = 0;
 
+    if (NULL == p_this->pfn_timer_set) {
+        p_this->pfn_timer_set = __softimer_set;
+    }
+
     return 0;
+}
+
+void rotary_encoder_event_import (rotary_encoder_t       *p_this,
+                                  rotary_encoder_event_t  event,
+                                  uint8_t                 signals)
+{
+    p_this->a_level = signals & BIT(0);
+    p_this->b_level = signals & BIT(1);
+    __EVT_IN(p_this, event);
 }
 
 void rotary_encoder_signals_import (rotary_encoder_t  *p_this,
@@ -259,7 +283,7 @@ void rotary_encoder_signals_import (rotary_encoder_t  *p_this,
 
     /* 500us 软件定时器 */
     if (p_this->is_softimer_on) {
-        __EVT_IN(p_this, __EVT_TIMER_OVERFLOW);
+        __EVT_IN(p_this, ROTARY_ENCODER_EVT_TIMER_OVERFLOW);
     }
     if (0x00 == sig_trig) {
         return;
@@ -269,18 +293,18 @@ void rotary_encoder_signals_import (rotary_encoder_t  *p_this,
 
         if (sig_trig & BIT(0)) {
             if (p_this->a_level) {
-                __EVT_IN(p_this, __EVT_A_RASING);
+                __EVT_IN(p_this, ROTARY_ENCODER_EVT_A_RASING);
             } else {
-                __EVT_IN(p_this, __EVT_A_FALLING);
+                __EVT_IN(p_this, ROTARY_ENCODER_EVT_A_FALLING);
             }
 
         }
 
         if (sig_trig & BIT(1)) {
             if (p_this->b_level) {
-                __EVT_IN(p_this, __EVT_B_RASING);
+                __EVT_IN(p_this, ROTARY_ENCODER_EVT_B_RASING);
             } else {
-                __EVT_IN(p_this, __EVT_B_FALLING);
+                __EVT_IN(p_this, ROTARY_ENCODER_EVT_B_FALLING);
             }
 
         }
