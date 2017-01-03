@@ -13,6 +13,8 @@ __工具宏集__ 常用宏/位操作/大小端字节操作
 
 __tinyprintf__ 一个轻量的格式化输出函数库 不支持浮点数(考虑以后添加) fork from [tinyprintf](https://github.com/cjlano/tinyprintf)
 
+__Rotary Encoder__ 旋转编码器
+
 进行中
 ------
 __MSM__ UML状态机
@@ -21,7 +23,7 @@ __Ring Buffer__ 循环队列缓冲区
 
 __Rx/Tx Control__ 接收/发送流控制
 
-__Rotary Encoder__ 旋转编码器
+
 
 计划
 -----
@@ -32,3 +34,9 @@ __堆内存/内存池__
 __简单事件机制__
 
 __SLIP帧控制__
+
+__RGBLED__
+
+__灯效控制(单灯/条形/矩阵)__
+
+__按键扫描(单键/矩阵)__
